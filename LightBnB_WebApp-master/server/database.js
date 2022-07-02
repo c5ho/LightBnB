@@ -10,31 +10,9 @@ const pool = new Pool({
   database: 'lightbnb'
 });
 
-
-// the following assumes that you named your connection variable `pool` and is a test to verify connection with lightbnb db
-//pool.query(`SELECT title FROM properties LIMIT 10;`).then(response => {console.log(response)})
-
-
 /// Users
 
-/**
- * Get a single user from the database given their email.
- * @param {String} email The email of the user.
- * @return {Promise<{}>} A promise to the user.
- */
-// const getUserWithEmail = function(email) {
-//   let user;
-//   for (const userId in users) {
-//     user = users[userId];
-//     if (user.email.toLowerCase() === email.toLowerCase()) {
-//       break;
-//     } else {
-//       user = null;
-//     }
-//   }
-//   return Promise.resolve(user);
-// }
-
+/* Get a single user from the database given their email. */
 const getUserWithEmail = (email) => {
   return pool
     .query(`SELECT * FROM users WHERE email = $1`, [email])
@@ -48,15 +26,7 @@ const getUserWithEmail = (email) => {
 }
 exports.getUserWithEmail = getUserWithEmail;
 
-/**
- * Get a single user from the database given their id.
- * @param {string} id The id of the user.
- * @return {Promise<{}>} A promise to the user.
- */
-// const getUserWithId = function(id) {
-//   return Promise.resolve(users[id]);
-// }
-
+/* Get a single user from the database given their id. */
 const getUserWithId = (id) => {
   return pool
     .query(`SELECT * FROM users WHERE id = $1`, [id])
@@ -67,22 +37,9 @@ const getUserWithId = (id) => {
       return err.message;
     })
 }
-
 exports.getUserWithId = getUserWithId;
 
-
-/**
- * Add a new user to the database.
- * @param {{name: string, password: string, email: string}} user
- * @return {Promise<{}>} A promise to the user.
- */
-// const addUser =  function(user) {
-//   const userId = Object.keys(users).length + 1;
-//   user.id = userId;
-//   users[userId] = user;
-//   return Promise.resolve(user);
-// }
-
+/* Add a new user to the database. */
 const addUser = (user) => {
   return pool
     .query(`INSERT INTO users (name, email, password) 
@@ -100,15 +57,7 @@ exports.addUser = addUser;
 
 /// Reservations
 
-/**
- * Get all reservations for a single user.
- * @param {string} guest_id The id of the user.
- * @return {Promise<[{}]>} A promise to the reservations.
- */
-// const getAllReservations = function(guest_id, limit = 10) {
-//   return getAllProperties(null, 2);
-// }
-
+/* Get all reservations for a single user. */
 const getAllReservations = (guest_id, limit = 10) => {
 
   return pool
@@ -127,46 +76,74 @@ const getAllReservations = (guest_id, limit = 10) => {
       return err.message;
     });
 };
-
-
-
 exports.getAllReservations = getAllReservations;
 
 /// Properties
 
-/**
- * Get all properties.
-//  * @param {{}} options An object containing query options.
-//  * @param {*} limit The number of results to return.
-//  * @return {Promise<[{}]>}  A promise to the properties.
- */
-//const getAllProperties = function(options, limit = 10) {
+/* Get all properties. */
+const getAllProperties = (options, limit) => {
+  
+  //array to hold parameters for the query
+  const queryParams = [];
+  
+  //start of query with before WHERE
+  let queryString = `
+  SELECT properties.*, avg(property_reviews.rating) as average_rating
+  FROM properties
+  JOIN property_reviews ON property_id = properties.id
+`;
 
-const getAllProperties = (options, limit = 10) => {
+  //if "My Listings" is selected (owner_id is passed into query)
+  if (options.owner_id) {
+    queryString += `WHERE owner_id = ${options.owner_id} `;
+  }
+  
+  //if city is passed into query
+  if (options.city) {
+    queryParams.push(`%${options.city}%`);
+    queryString += `WHERE city LIKE $${queryParams.length} `;
+  }
+  
+  //if both min and max price is passed into query
+  if (options.minimum_price_per_night && options.maximum_price_per_night) {
+    queryParams.push(options.minimum_price_per_night);
+    queryString += `AND cost_per_night > $${queryParams.length}`;
+    queryParams.push(options.maximum_price_per_night);
+    queryString += `AND cost_per_night < $${queryParams.length}`;
+  } 
+  //if only max price is passed into query
+  else if (options.minimum_price_per_night) {
+    queryParams.push(options.minimum_price_per_night);
+    queryString += `AND cost_per_night > $${queryParams.length}`;
+  }
+  //if only max price is passed into query
+  else if (options.maximum_price_per_night) {
+    queryParams.push(options.maximum_price_per_night);
+    queryString += `AND cost_per_night < $${queryParams.length}`;
+  }
 
-  return pool
-    .query(`SELECT * FROM properties LIMIT $1`, [limit])
-    .then((result) => {
-      return result.rows;
-    })
-    .catch((err) => {
-      return err.message;
-    });
+  queryString += `
+  GROUP BY properties.id`;
+
+  //if minimum rating is passed into query
+  if (options.minimum_rating) {
+    queryParams.push(options.minimum_rating);
+    queryString += `
+    HAVING avg(property_reviews.rating) > $${queryParams.length}`;
+  }
+
+  //other query paramters after WHERE (or HAVING if present)
+  queryParams.push(limit);
+  queryString += `
+  ORDER BY cost_per_night
+  LIMIT $${queryParams.length}`;
+
+  return pool.query(queryString, queryParams).then((res) => res.rows);
 };
-//   const limitedProperties = {};
-//   for (let i = 1; i <= limit; i++) {
-//     limitedProperties[i] = properties[i];
-//   }
-//   return Promise.resolve(limitedProperties);
-// }
 exports.getAllProperties = getAllProperties;
 
 
-/**
- * Add a property to the database
- * @param {{}} property An object containing all of the property details.
- * @return {Promise<{}>} A promise to the property.
- */
+/* Add a property to the database */
 const addProperty = function(property) {
   const propertyId = Object.keys(properties).length + 1;
   property.id = propertyId;
