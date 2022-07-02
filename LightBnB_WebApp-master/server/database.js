@@ -150,9 +150,6 @@ const getAllProperties = (options, limit) => {
   ORDER BY cost_per_night
   LIMIT $${queryParams.length}`;
 
-  console.log(queryString, queryParams);
-
-
   return pool.query(queryString, queryParams).then((res) => res.rows)
   .catch((err) => {
     return err.message;
@@ -160,42 +157,35 @@ const getAllProperties = (options, limit) => {
 };
 exports.getAllProperties = getAllProperties;
 
-
 /* Add a property to the database 
 * @param {{}} property An object containing all of the property details.
  * @return {Promise<{}>} A promise to the property.*/
 const addProperty = (property) => {
  
-  //array to hold parameters for the query
-  const queryParams = [];
-
-  queryParams.push(property.owner_id);
-  
-  for (key in property) {
-    queryParams.push(property[key]);
-  }  
-  queryParams.pop();
-  queryParams.push('true');
+  //array to hold parameters for the query from the passed in object
+  const queryParams = [
+    property.owner_id, 
+    property.title, 
+    property.description, 
+    property.thumbnail_photo_url, 
+    property.cover_photo_url, 
+    property.cost_per_night, 
+    property.parking_spaces, 
+    property.number_of_bathrooms,
+    property.number_of_bedrooms,
+    property.country, 
+    property.street, 
+    property.city, 
+    property.province, 
+    property.post_code, 
+  ];
 
   let queryString = `
-  INSERT INTO properties (owner_id, title, description, thumbnail_photo_url, cover_photo_url, cost_per_night, parking_spaces, number_of_bathrooms, number_of_bedrooms, country, street, city, province, post_code, active)
-  VALUES (
-  `;
-
-  for (let param = 1; param <= queryParams.length; param++) {
-    if (param === queryParams.length) {
-      queryString += `$${param})`;  
-    }
-    else {
-      queryString += `$${param}, `;
-    }
-  }
-
-  console.log(queryString, queryParams);
-
+  INSERT INTO properties (owner_id, title, description, thumbnail_photo_url, cover_photo_url, cost_per_night, parking_spaces, number_of_bathrooms, number_of_bedrooms, country, street, city, province, post_code, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true) RETURNING *;`;
+  
   return pool.query(queryString, queryParams).then((res) => res.rows)
   .catch((err) => {
     return err.message;
   });
-}
+};
 exports.addProperty = addProperty;
